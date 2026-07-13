@@ -1,0 +1,12 @@
+{
+  "name": "ellingsruter",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Next departures from Ellingsrudåsen T-bane station",
+  "scripts": {
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}
