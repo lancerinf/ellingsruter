@@ -48,13 +48,33 @@ const DEPARTURE_QUERY = `
   }
 `;
 
-// Cache stop place data for 1 hour
+// Cache with dynamic expiration: expire when the earliest departure is within 1 minute
 let cachedStopPlace = null;
 let cacheTime = 0;
 
+function getCacheExpirationTime(data) {
+  const quays = data?.stopPlace?.quays;
+  if (!quays) return Date.now() + 30000; // fallback: 30 seconds
+
+  let latestFuture = 0;
+  for (const quay of quays) {
+    const calls = quay.estimatedCalls || [];
+    for (const call of calls) {
+      const depTime = new Date(call.aimedDepartureTime).getTime();
+      if (depTime > Date.now() && depTime > latestFuture) {
+        latestFuture = depTime;
+      }
+    }
+  }
+
+  if (latestFuture === 0) return Date.now() + 30000; // no future departures
+  return latestFuture - 60000; // expire 1 minute before latest departure
+}
+
 async function getDepartures() {
   const now = Date.now();
-  if (cachedStopPlace && now - cacheTime < 3600000) {
+  const cacheExpires = cachedStopPlace ? getCacheExpirationTime(cachedStopPlace) : 0;
+  if (cachedStopPlace && now < cacheExpires) {
     return cachedStopPlace;
   }
 
@@ -63,7 +83,7 @@ async function getDepartures() {
     headers: ENTUR_HEADERS,
     body: JSON.stringify({
       query: DEPARTURE_QUERY,
-      variables: { stopPlaceId: STOP_PLACE_ID, numberOfDepartures: 5 },
+      variables: { stopPlaceId: STOP_PLACE_ID, numberOfDepartures: 15 },
     }),
   });
 

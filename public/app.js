@@ -70,18 +70,20 @@ function renderDepartures(data) {
     for (const call of calls) {
       if (call.aimedDepartureTime) {
         const depTime = new Date(call.aimedDepartureTime);
-        // Only show departures within the next 4 hours
-        if (depTime >= now && depTime <= new Date(now.getTime() + 4 * 60 * 60 * 1000)) {
+        // Only show departures that haven't passed yet
+        if (depTime >= now) {
           allDepartures.push(call);
         }
       }
     }
   }
 
-  // Sort by departure time
+  // Sort by departure time and take the next 6
   allDepartures.sort((a, b) =>
     new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime)
   );
+
+  allDepartures = allDepartures.slice(0, 6);
 
   if (allDepartures.length === 0) {
     errorEl.textContent = 'Ingen avganger funnet';
