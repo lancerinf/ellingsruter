@@ -18,7 +18,7 @@ Start the dev server (with auto-reload on file changes):
 npm run dev
 ```
 
-The server starts on **http://localhost:3000**.
+The server starts on **http://localhost:3030**.
 
 ## Stop
 
@@ -26,46 +26,41 @@ Press `Ctrl+C` in the terminal where the server is running.
 
 ## How it works
 
-- The server fetches departure data from the [Entur Journey Planner API](https://developer.entur.org/) for Ellingsrudåsen station (`NSR:StopPlace:58220`).
-- Results are cached for 1 hour to avoid excessive API calls.
+- The server fetches the next 6 departures from the [Entur Journey Planner API](https://developer.entur.org/) for Ellingsrudåsen station (`NSR:StopPlace:58220`).
+- Results are cached until the time of the first departure has passed.
 - The frontend auto-refreshes every 30 seconds to keep departure times up to date.
-- Only departures within the next 4 hours are shown.
+- Only the next 6 departures are shown by the client.
 
 ## Run with Podman Quadlet
 
-First, build the image locally:
+Build the image locally:
 
 ```bash
 podman build -t ellingsruter .
-```
-
-Then copy the `.container` file to your Quadlet directory:
-
-```bash
-cp ellingsruter.container ~/.config/containers/systemd/
 ```
 
 Reload and start the service:
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user start ellingsruter.container
+systemctl --user start ellingsruter-podman
 ```
 
-Check status:
+Restart the service and check status :
 
 ```bash
-systemctl --user status ellingsruter.container
+systemctl --user restart ellingsruter-podman
+systemctl --user status ellingsruter-podman
 ```
 
 Stop and disable:
 
 ```bash
-systemctl --user stop ellingsruter.container
-systemctl --user disable ellingsruter.container
+systemctl --user stop ellingsruter-podman
+systemctl --user disable ellingsruter-podman
 ```
 
-The app will be available at **http://localhost:3000**.
+The app will be available at **http://localhost:3030**.
 
 ## Configuration
 

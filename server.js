@@ -48,7 +48,7 @@ const DEPARTURE_QUERY = `
   }
 `;
 
-// Cache with dynamic expiration: expire when the earliest departure is within 1 minute
+// Cache with dynamic expiration: expire 30 seconds after earliest departure time
 let cachedStopPlace = null;
 let cacheTime = 0;
 
@@ -56,19 +56,19 @@ function getCacheExpirationTime(data) {
   const quays = data?.stopPlace?.quays;
   if (!quays) return Date.now() + 30000; // fallback: 30 seconds
 
-  let latestFuture = 0;
+  let earliestFuture = Infinity;
   for (const quay of quays) {
     const calls = quay.estimatedCalls || [];
     for (const call of calls) {
       const depTime = new Date(call.aimedDepartureTime).getTime();
-      if (depTime > Date.now() && depTime > latestFuture) {
-        latestFuture = depTime;
+      if (depTime > Date.now() && depTime < earliestFuture) {
+        earliestFuture = depTime;
       }
     }
   }
 
-  if (latestFuture === 0) return Date.now() + 30000; // no future departures
-  return latestFuture - 60000; // expire 1 minute before latest departure
+  if (earliestFuture === Infinity) return Date.now() + 30000; // no future departures
+  return earliestFuture + 30000; // expire 1 minute before earliest departure
 }
 
 async function getDepartures() {
@@ -83,7 +83,7 @@ async function getDepartures() {
     headers: ENTUR_HEADERS,
     body: JSON.stringify({
       query: DEPARTURE_QUERY,
-      variables: { stopPlaceId: STOP_PLACE_ID, numberOfDepartures: 15 },
+      variables: { stopPlaceId: STOP_PLACE_ID, numberOfDepartures: 6 },
     }),
   });
 
@@ -121,7 +121,7 @@ app.get('/api/departures', async (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.NODE_PORT || 3030;
 app.listen(PORT, () => {
   console.log(`Ellingsruter listening on http://localhost:${PORT}`);
 });
