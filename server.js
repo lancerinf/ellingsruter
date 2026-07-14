@@ -48,7 +48,7 @@ const DEPARTURE_QUERY = `
   }
 `;
 
-// Cache with dynamic expiration: expire 30 seconds after earliest departure time
+// Cache with dynamic expiration: expire 30 seconds after the first departure in the set passes
 let cachedStopPlace = null;
 let cacheTime = 0;
 
@@ -56,19 +56,20 @@ function getCacheExpirationTime(data) {
   const quays = data?.stopPlace?.quays;
   if (!quays) return Date.now() + 30000; // fallback: 30 seconds
 
-  let earliestFuture = Infinity;
+  let firstDeparture = Infinity;
   for (const quay of quays) {
     const calls = quay.estimatedCalls || [];
     for (const call of calls) {
       const depTime = new Date(call.aimedDepartureTime).getTime();
-      if (depTime > Date.now() && depTime < earliestFuture) {
-        earliestFuture = depTime;
+      if (depTime < firstDeparture) {
+        firstDeparture = depTime;
       }
     }
   }
 
-  if (earliestFuture === Infinity) return Date.now() + 30000; // no future departures
-  return earliestFuture + 30000; // expire 30 seconds after earliest departure
+  if (firstDeparture === Infinity) return Date.now() + 30000;
+  // Expire 30 seconds after the first departure passes
+  return firstDeparture + 30000;
 }
 
 async function getDepartures() {
@@ -86,7 +87,7 @@ async function getDepartures() {
     headers: ENTUR_HEADERS,
     body: JSON.stringify({
       query: DEPARTURE_QUERY,
-      variables: { stopPlaceId: STOP_PLACE_ID, numberOfDepartures: 6 },
+      variables: { stopPlaceId: STOP_PLACE_ID, numberOfDepartures: 7 },
     }),
   });
   const elapsed = Date.now() - start;
