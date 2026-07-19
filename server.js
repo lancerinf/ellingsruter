@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { readFileSync } from 'fs';
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -122,6 +123,97 @@ app.get('/api/departures', async (req, res) => {
   } catch (err) {
     console.error('[server] Unexpected error: %s', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Pre-rendered HTML template for Kindle (no JavaScript)
+const kindleTemplatePath = path.join(__dirname, 'public', 'kindle.html');
+let kindleTemplate = '';
+try {
+  kindleTemplate = readFileSync(kindleTemplatePath, 'utf-8');
+} catch (e) {
+  console.warn('[server] Could not read kindle.html template:', e.message);
+}
+
+app.get('/kindle', async (req, res) => {
+  try {
+    const data = await getDepartures();
+    if (data.error) {
+      const html = kindleTemplate
+        .replace('<!--DEPARTURES-->', `<div class="error">${data.error}</div>`)
+        .replace('<!--REFRESH_INFO-->', `Feil: ${data.error}`);
+      return res.status(500).type('text/html').send(html);
+    }
+
+    const now = new Date();
+    const quays = data?.stopPlace?.quays;
+    if (!quays || quays.length === 0) {
+      const html = kindleTemplate
+        .replace('<!--DEPARTURES-->', '<div class="error">Ingen avganger funnet</div>')
+        .replace('<!--REFRESH_INFO-->', 'Ingen avganger funnet');
+      return res.type('text/html').send(html);
+    }
+
+    // Collect all departures that haven't passed yet
+    let allDepartures = [];
+    for (const quay of quays) {
+      const calls = quay.estimatedCalls || [];
+      for (const call of calls) {
+        if (call.aimedDepartureTime) {
+          const depTime = new Date(call.aimedDepartureTime);
+          if (depTime >= now) {
+            allDepartures.push(call);
+          }
+        }
+      }
+    }
+
+    // Sort by departure time and take the next 6
+    allDepartures.sort((a, b) =>
+      new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime)
+    );
+    allDepartures = allDepartures.slice(0, 6);
+
+    if (allDepartures.length === 0) {
+      const html = kindleTemplate
+        .replace('<!--DEPARTURES-->', '<div class="error">Ingen avganger funnet</div>')
+        .replace('<!--REFRESH_INFO-->', 'Ingen avganger funnet');
+      return res.type('text/html').send(html);
+    }
+
+    const html = kindleTemplate
+      .replace('<!--DEPARTURES-->', allDepartures.map((dep) => {
+        const lineCode = dep.serviceJourney?.line?.publicCode || '?';
+        const presentation = dep.serviceJourney?.line?.presentation || {};
+        let colour = presentation.colour || presentation.color || '#64748b';
+        if (!colour.startsWith('#')) colour = `#${colour}`;
+        const textColor = presentation.textColour || '#ffffff';
+        const destination = dep.destinationDisplay?.frontText || 'Ukjent';
+        const time = new Date(dep.aimedDepartureTime).toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' });
+        const diffMin = Math.round((new Date(dep.aimedDepartureTime) - new Date()) / 60000);
+        const relative = diffMin <= 0 ? 'Avgått' : `Om ${diffMin} min`;
+        const isImminent = diffMin <= 2;
+        const imminentClass = isImminent ? ' imminent' : '';
+        return `<div class="departure-card${imminentClass}">
+          <div class="line-badge" style="background:${colour};color:${textColor};">${lineCode}</div>
+          <div class="departure-info">
+            <div class="departure-destination">${destination}</div>
+          </div>
+          <div class="departure-time${imminentClass}">
+            <div class="time">${time}</div>
+            <div class="relative">${relative}</div>
+          </div>
+        </div>`;
+      }).join('\n      '))
+      .replace('<!--REFRESH_INFO-->', `Sist oppdatert: ${now.toLocaleTimeString('nb-NO')}`);
+
+    res.type('text/html').send(html);
+  } catch (err) {
+    console.error('[server] Unexpected error in /kindle: %s', err.message);
+    const html = kindleTemplate
+      .replace('<!--DEPARTURES-->', `<div class="error">Kunne ikke hente avganger</div>`)
+      .replace('<!--REFRESH_INFO-->', 'Feil ved lasting');
+    res.status(500).type('text/html').send(html);
   }
 });
 
