@@ -172,7 +172,7 @@ app.get('/kindle', async (req, res) => {
     allDepartures.sort((a, b) =>
       new Date(a.aimedDepartureTime) - new Date(b.aimedDepartureTime)
     );
-    allDepartures = allDepartures.slice(0, 6);
+    allDepartures = allDepartures.slice(0, 5);
 
     if (allDepartures.length === 0) {
       const html = kindleTemplate
@@ -184,24 +184,23 @@ app.get('/kindle', async (req, res) => {
     const html = kindleTemplate
       .replace('<!--DEPARTURES-->', allDepartures.map((dep) => {
         const lineCode = dep.serviceJourney?.line?.publicCode || '?';
-        const presentation = dep.serviceJourney?.line?.presentation || {};
-        let colour = presentation.colour || presentation.color || '#64748b';
-        if (!colour.startsWith('#')) colour = `#${colour}`;
-        const textColor = presentation.textColour || '#ffffff';
         const destination = dep.destinationDisplay?.frontText || 'Ukjent';
         const time = new Date(dep.aimedDepartureTime).toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' });
         const diffMin = Math.round((new Date(dep.aimedDepartureTime) - new Date()) / 60000);
-        const relative = diffMin <= 0 ? 'Avgått' : `Om ${diffMin} min`;
-        const isImminent = diffMin <= 2;
-        const imminentClass = isImminent ? ' imminent' : '';
-        return `<div class="departure-card${imminentClass}">
-          <div class="line-badge" style="background:${colour};color:${textColor};">${lineCode}</div>
-          <div class="departure-info">
-            <div class="departure-destination">${destination}</div>
-          </div>
-          <div class="departure-time${imminentClass}">
-            <div class="time">${time}</div>
-            <div class="relative">${relative}</div>
+        const relative = diffMin <= 0 ? 'Avgått' : `${diffMin} min`;
+        return `<div class="departure-card">
+          <div class="departure-row">
+            <div class="line-badge">${lineCode}</div>
+            <div class="departure-info">
+              <div class="departure-destination">${destination}</div>
+            </div>
+            <div class="departure-time">
+              <span class="departure-time-inner">
+                <span class="relative">${relative}</span>
+                <span class="separator">·</span>
+                <span class="time">${time}</span>
+              </span>
+            </div>
           </div>
         </div>`;
       }).join('\n      '))
