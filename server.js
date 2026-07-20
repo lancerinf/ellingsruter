@@ -181,12 +181,14 @@ app.get('/kindle', async (req, res) => {
       return res.type('text/html').send(html);
     }
 
+    const oslo = 'Europe/Oslo';
     const html = kindleTemplate
       .replace('<!--DEPARTURES-->', allDepartures.map((dep) => {
         const lineCode = dep.serviceJourney?.line?.publicCode || '?';
         const destination = dep.destinationDisplay?.frontText || 'Ukjent';
-        const time = new Date(dep.aimedDepartureTime).toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' });
-        const diffMin = Math.round((new Date(dep.aimedDepartureTime) - new Date()) / 60000);
+        const depTime = new Date(dep.aimedDepartureTime);
+        const time = depTime.toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit', timeZone: oslo });
+        const diffMin = Math.round((depTime - now) / 60000);
         const relative = diffMin <= 0 ? 'Avgått' : `${diffMin} min`;
         return `<div class="departure-card">
           <div class="departure-row">
@@ -204,7 +206,7 @@ app.get('/kindle', async (req, res) => {
           </div>
         </div>`;
       }).join('\n      '))
-      .replace('<!--REFRESH_INFO-->', `Sist oppdatert: ${now.toLocaleTimeString('nb-NO')}`);
+      .replace('<!--REFRESH_INFO-->', `Sist oppdatert: ${now.toLocaleTimeString('nb-NO', { timeZone: oslo })}`);
 
     res.type('text/html').send(html);
   } catch (err) {
